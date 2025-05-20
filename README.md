@@ -1,0 +1,2 @@
+# regulus
+Simple file dialog
