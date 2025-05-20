@@ -48,7 +48,7 @@ pub fn deinit() void {
     clay_context.debug_mode_on = false;
 }
 
-pub fn render() !void {
+pub fn render() !?[]const u8 {
     if (rl.isKeyPressed(.d) and debug_mode) {
         clay_context.debug_mode_on = !clay_context.debug_mode_on;
         clay.setDebugModeEnabled(clay_context.debug_mode_on);
@@ -61,11 +61,10 @@ pub fn render() !void {
     }, rl.isMouseButtonDown(.left));
 
     if (clay_context.change_dir != null) {
-        if (try isDir(clay_context.change_dir.?)) {
+        if (try flst.isDir(clay_context.change_dir.?)) {
             try flst.changeDir(clay_context.change_dir.?);
         } else {
-            std.debug.print("{s}", .{clay_context.change_dir.?});
-            std.process.exit(0);
+            return clay_context.change_dir.?;
         }
         clay_context.change_dir = null;
     }
@@ -86,32 +85,8 @@ pub fn render() !void {
     rl.beginDrawing();
     try renderer.clayRaylibRender(&render_commands, clay_context.allocator);
     rl.endDrawing();
-}
 
-fn isDir(file_name: []const u8) !bool {
-    if (builtin.target.os.tag == .windows) {
-        // Windows is annoying and stat() doesn't tell me 
-        // if something is a Dir or File so I had to do this
-        const file_test = std.fs.cwd().openFile(file_name, .{}) catch |err| switch (err) {
-                error.IsDir => null,
-                else => return err,
-        };
-
-        if (file_test == null) {
-            return true;
-        } else {
-            return false;
-        }
-    } else {
-        const stat = std.fs.cwd().statFile(file_name) catch {
-            return false;
-        };
-        switch (stat.kind) {
-            .directory => return true,
-            .file => return false,
-            else => return false,
-        }
-    }
+    return null;
 }
 
 fn createLayout() !clay.ClayArray(clay.RenderCommand) {
@@ -163,7 +138,7 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
             clay.UI()(.{
                 .layout = .{
                     .sizing = .grow,
-                    .child_alignment = .center
+                    .child_alignment = .{ .x = .left, .y = .center },
                 },
                 .scroll = .{
                     .vertical = true,
@@ -172,7 +147,10 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
                 .background_color = light_grey,
                 .corner_radius = global_corner_radius,
             })({
-                clay.text("Here will be path", .{
+                var cwd_buf = std.mem.zeroes([std.fs.max_path_bytes:0]u8);
+                const cwd_text = @as([:0]u8, @ptrCast(try std.fs.cwd().realpath(".", &cwd_buf)));
+
+                clay.text(cwd_text, .{
                     .font_id = FONT_ID_QUICKSAND_SEMIBOLD_24,
                     .font_size = 24,
                     .color = .{ 61, 26, 5, 255 }
@@ -196,10 +174,7 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
             .background_color = light_grey,
             .corner_radius = global_corner_radius,
         })({
-            var dirs_iter = std.mem.splitScalar(u8, flst.fs_context.dir_list.items, '\n');
-
-            var i: usize = 0;
-            while (dirs_iter.next()) |item| : (i += 1) {
+            for (flst.fs_context.dir_list.items) |item| {
                 if (item.len == 0) break;
 
                 clay.UI()(.{
@@ -209,7 +184,7 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
                         .padding = .all(8),
                     },
                     .background_color = if (clay.hovered()) red
-                        else if (!try isDir(item[0..item.len-1])) white
+                        else if (!try flst.isDir(item[0..item.len-1])) white
                         else orange,
                     .corner_radius = .all(8),
                 })({
