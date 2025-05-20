@@ -83,7 +83,11 @@ pub fn render() !?[]const u8 {
     if (context.finished) {
         if (context.mode == .select) {
             try context.selected_file.appendSlice(context.cwd_str.?);
-            try context.selected_file.append('/');
+            if (builtin.target.os.tag == .windows) {
+                try context.selected_file.append('\\');
+            } else {
+                try context.selected_file.append('/');
+            }
             try context.selected_file.appendSlice(context.change_dir.?);
             return context.selected_file.items;
         } else {
@@ -91,7 +95,11 @@ pub fn render() !?[]const u8 {
             try context.selected_file.appendSlice(cwd_text);
             context.allocator.free(cwd_text);
 
-            try context.selected_file.append('/');
+            if (builtin.target.os.tag == .windows) {
+                try context.selected_file.append('\\');
+            } else {
+                try context.selected_file.append('/');
+            }
             try context.selected_file.appendSlice(context.input_text.items);
             context.finished = false;
 
