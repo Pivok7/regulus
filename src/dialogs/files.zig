@@ -3,7 +3,6 @@ const builtin = @import("builtin");
 const rl = @import("raylib");
 const clay = @import("zclay");
 const renderer = @import("../raylib_render_clay.zig");
-const debug_mode = @import("../main.zig").debug_mode;
 const flst = @import("../file_system.zig");
 const ui = @import("../ui.zig");
 const Allocator = std.mem.Allocator;
@@ -20,6 +19,7 @@ pub var context = struct{
     mode: Modes,
     selected_file: std.ArrayList(u8),
     change_dir: ?[]const u8,
+    cwd_str: ?[]const u8,
     input_text: std.ArrayList(u8),
     inputting: bool,
     finished: bool,
@@ -28,6 +28,7 @@ pub var context = struct{
     .mode = undefined,
     .selected_file = undefined,
     .change_dir = null,
+    .cwd_str = null,
     .input_text = undefined,
     .inputting = false,
     .finished = false,
@@ -37,6 +38,7 @@ pub fn init(allocator: Allocator, mode: Modes) !void {
     context.allocator = allocator;
     context.mode = mode;
     context.selected_file = std.ArrayList(u8).init(allocator);
+    context.cwd_str = try std.fs.cwd().realpathAlloc(context.allocator, ".");
 
     context.input_text = std.ArrayList(u8).init(allocator);
     try context.input_text.appendSlice("filename");
@@ -48,6 +50,7 @@ pub fn deinit() void {
     context.mode = undefined;
     context.selected_file.deinit();
     context.change_dir = null;
+    if (context.cwd_str != null) context.allocator.free(context.cwd_str.?);
     context.input_text.deinit();
     context.inputting = false;
 } 
@@ -57,6 +60,19 @@ pub fn render() !?[]const u8 {
         if (try flst.isDir(context.change_dir.?)) {
             try flst.changeDir(context.change_dir.?);
             context.change_dir = null;
+            
+            if (context.cwd_str != null) {
+                context.allocator.free(context.cwd_str.?);
+            }
+            context.cwd_str = try std.fs.cwd().realpathAlloc(context.allocator, ".");
+
+            // Go to top
+            clay.updateScrollContainers(
+                false,
+                .{ .x = 0, .y = 100000 },
+                100.0,
+            );
+
         } else {
             if (context.mode == .select) {
                 context.finished = true;
@@ -66,6 +82,8 @@ pub fn render() !?[]const u8 {
 
     if (context.finished) {
         if (context.mode == .select) {
+            try context.selected_file.appendSlice(context.cwd_str.?);
+            try context.selected_file.append('/');
             try context.selected_file.appendSlice(context.change_dir.?);
             return context.selected_file.items;
         } else {
@@ -111,7 +129,6 @@ fn inputText() !void {
     
     if (context.inputting) {
         switch (key) {
-            .null => {},
             .backspace => {
                 _ = context.input_text.pop();
             },
@@ -119,7 +136,9 @@ fn inputText() !void {
                 context.finished = true;
             },
             else => {
-                try context.input_text.append(@intCast(key_char));
+                if (key_char != 0 and key_char < 128) {
+                    try context.input_text.append(@intCast(key_char));
+                }
             }
         }
     }
@@ -184,10 +203,7 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
                 .background_color = ui.light_grey,
                 .corner_radius = ui.global_corner_radius,
             })({
-                var cwd_buf = std.mem.zeroes([std.fs.max_path_bytes:0]u8);
-                const cwd_text = @as([:0]u8, @ptrCast(try std.fs.cwd().realpath(".", &cwd_buf)));
-
-                clay.text(cwd_text, .{
+                clay.text(context.cwd_str orelse "Null", .{
                     .font_id = ui.FONT_ID_QUICKSAND_SEMIBOLD_24,
                     .font_size = 24,
                     .color = .{ 61, 26, 5, 255 }
@@ -208,7 +224,12 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
             clay.UI()(.{
                 .id = .ID("DirectoryListContainer"),
                 .layout = .{
-                    .sizing = .grow,
+                    // A bit of magic numbers becuase setting sizing to grow caused some problems
+                    .sizing = .{ 
+                        .h = if (context.mode == .select) .fixed(@as(f32, @floatFromInt(rl.getScreenHeight())) - 128.0)
+                            else .fixed(@as(f32, @floatFromInt(rl.getScreenHeight())) - 178.0),
+                        .w = .grow
+                    },
                     .direction = .top_to_bottom,
                     .child_alignment = .{ .x = .center },
                     .padding = .all(16),
@@ -221,14 +242,14 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
                 .background_color = ui.light_grey,
                 .corner_radius = ui.global_corner_radius,
             })({
+                const hovered_base = clay.pointerOver(clay.getElementId("DirectoryListContainer"));
+
                 for (flst.fs_context.dir_list.items, 0..) |item, i| {
                     if (item.len == 0) break;
                     if (i >= max_files) {
                         std.log.warn("File limit of {d} exceeded", .{max_files});
                         break;
                     }
-
-                    const hovered_base = clay.pointerOver(clay.getElementId("DirectoryListContainer"));
 
                     clay.UI()(.{
                         .layout = .{
@@ -241,15 +262,15 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
                             else ui.orange,
                         .corner_radius = .all(8),
                     })({
-                        if (hovered_base) {
-                            clay.onHover([*c]const u8, item.ptr, struct {
-                                pub fn callback(_: clay.ElementId, _: clay.PointerData, user_data: [*c]const u8) void {
-                                    if (rl.isMouseButtonPressed(.left)) {
+                        clay.onHover([*c]const u8, item.ptr, struct {
+                            pub fn callback(_: clay.ElementId, _: clay.PointerData, user_data: [*c]const u8) void {
+                                if (rl.isMouseButtonPressed(.left)) {
+                                    if (clay.pointerOver(clay.getElementId("DirectoryListContainer"))) {
                                         context.change_dir = std.mem.span(user_data);
                                     }
                                 }
-                            }.callback);
-                        }
+                            }
+                        }.callback);
 
                         clay.text(
                             item,
