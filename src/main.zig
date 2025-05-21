@@ -28,6 +28,8 @@ pub fn main() !void {
     defer _ = dba.deinit();
     const allocator = dba.allocator();
 
+    const stdout = std.io.getStdOut().writer();
+
     // We want to keep args in memory to use them later in program
     const args = try std.process.argsAlloc(allocator);
     errdefer std.process.argsFree(allocator, args);
@@ -63,7 +65,7 @@ pub fn main() !void {
         .vsync_hint = true,
     });
     rl.setTraceLogLevel(.none);
-    rl.initWindow(1000, 800, "Raylib zig Example");
+    rl.initWindow(1000, 800, "Regulus");
     defer rl.closeWindow();
 
     // init clay
@@ -80,7 +82,7 @@ pub fn main() !void {
     while (!rl.windowShouldClose()) {
         const res = try ui.render();
         if (res != null) {
-            std.debug.print("{s}", .{res.?});
+            try stdout.print("{s}", .{res.?});
             std.process.exit(0);
         }
     }
