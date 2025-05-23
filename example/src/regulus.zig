@@ -86,10 +86,8 @@ fn regulusRun(allocator: std.mem.Allocator, mode: Modes, context: *FileDialogCon
         return;
     }
 
-    context.output = @as([:0]u8, @ptrCast(context.output[0..
-        std.mem.indexOfScalar(u8, context.output, 0)
-        orelse context.output.len
-    ]));
+    const output_end = std.mem.indexOfScalar(u8, context.output, 0) orelse context.output.len;
+    context.output = context.output[0..output_end:0];
 
     context.success = true;
     context.state = .finished;
