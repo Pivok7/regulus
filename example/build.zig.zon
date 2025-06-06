@@ -1,0 +1,20 @@
+.{
+    .name = .example,
+
+    .version = "0.0.1",
+
+    .fingerprint = 0x6eec9b9f27887d5e, // Changing this has security and trust implications.
+
+    .dependencies = .{
+        .regulus = .{
+            .url = "git+https://github.com/Pivok7/regulus#0266c1fba4205a98d89fd016249f1f28cceb8048",
+            .hash = "regulus-0.0.0-UDzTzjnXAACZJfCeTtamCaQNZ6WxLM0gHY_wfG0U8Okz",
+        },
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

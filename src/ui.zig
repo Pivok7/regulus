@@ -4,7 +4,6 @@ const rl = @import("raylib");
 const clay = @import("zclay");
 const renderer = @import("raylib_render_clay.zig");
 const debug_mode = @import("main.zig").debug_mode;
-const flst = @import("file_system.zig");
 const Allocator = std.mem.Allocator;
 
 const dial_files = @import("dialogs/files.zig");
@@ -76,6 +75,18 @@ pub fn render() !?[]const u8 {
         .x = mouse_pos.x,
         .y = mouse_pos.y,
     }, rl.isMouseButtonDown(.left));
+
+    const scroll_delta = rl.getMouseWheelMoveV().multiply(.{ .x = 6, .y = 6 });
+    clay.updateScrollContainers(
+        false,
+        .{ .x = scroll_delta.x, .y = scroll_delta.y },
+        rl.getFrameTime(),
+    );
+
+    clay.setLayoutDimensions(.{
+        .w = @floatFromInt(rl.getScreenWidth()),
+        .h = @floatFromInt(rl.getScreenHeight()),
+    });
 
     const res = try dial_files.render();
     if (res != null) {

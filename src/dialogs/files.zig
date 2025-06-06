@@ -107,22 +107,11 @@ pub fn render() !?[]const u8 {
         }
     }
 
-    const scroll_delta = rl.getMouseWheelMoveV().multiply(.{ .x = 6, .y = 6 });
-    clay.updateScrollContainers(
-        false,
-        .{ .x = scroll_delta.x, .y = scroll_delta.y },
-        rl.getFrameTime(),
-    );
-
-    clay.setLayoutDimensions(.{
-        .w = @floatFromInt(rl.getScreenWidth()),
-        .h = @floatFromInt(rl.getScreenHeight()),
-    });
-    var render_commands = try createLayout();
-
     if (context.mode == .save) {
         try inputText();
     }
+
+    var render_commands = try createLayout();
 
     rl.beginDrawing();
     try renderer.clayRaylibRender(&render_commands, context.allocator);
