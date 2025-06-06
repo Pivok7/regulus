@@ -133,8 +133,11 @@ fn inputText() !void {
                 context.finished = true;
             },
             else => {
-                if (key_char != 0 and key_char < 128) {
-                    try context.input_text.append(@intCast(key_char));
+                if (key_char != 0) {
+                    var utf8: [4]u8 = undefined;
+                    const out_bytes = try std.unicode.utf8Encode(@intCast(key_char), &utf8);
+
+                    try context.input_text.appendSlice(utf8[0..out_bytes]);
                 }
             }
         }
