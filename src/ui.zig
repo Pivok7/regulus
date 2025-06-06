@@ -85,8 +85,23 @@ pub fn render() !?[]const u8 {
     return null;
 }
 
+const all_letters =
+    \\!\"#$%&'()*+,-./
+    \\0123456789
+    \\:;<=>?@
+    \\ABCDEFGHIJKLMNOPQRSTUVWXYZ
+    \\[\\]^_`
+    \\abcdefghijklmnopqrstuvwxyz
+    \\{|}~
+    
+    \\≠²³¢€½§·«»πœę©ß←↓→óþąśðæŋ’ə…łżźć„”ńµ≤≥
+;
+
 fn loadFont(file_data: ?[]const u8, font_id: u16, font_size: i32) !void {
-    renderer.raylib_fonts[font_id] = try rl.loadFontFromMemory(".ttf", file_data, font_size * 2, null);
+    const codepoints = try rl.loadCodepoints(all_letters);
+    defer rl.unloadCodepoints(codepoints);
+
+    renderer.raylib_fonts[font_id] = try rl.loadFontFromMemory(".ttf", file_data, font_size * 2, codepoints);
     rl.setTextureFilter(renderer.raylib_fonts[font_id].?.texture, .bilinear);
 }
 
