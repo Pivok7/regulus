@@ -48,7 +48,7 @@ pub fn init(allocator: std.mem.Allocator, mode: Modes) !void {
     clay.setMeasureTextFunction(void, {}, renderer.measureText);
 
     // load assets
-    try loadFont(@embedFile("./resources/Quicksand-Semibold.ttf"), FONT_ID_QUICKSAND_SEMIBOLD_24, 24);
+    try loadFont(allocator, @embedFile("./resources/Quicksand-Semibold.ttf"), FONT_ID_QUICKSAND_SEMIBOLD_24, 24);
 
     switch (context.mode) {
         .file_dialog_select => try dial_files.init(allocator, .select),
@@ -96,20 +96,19 @@ pub fn render() !?[]const u8 {
     return null;
 }
 
-const all_letters =
-    \\!\"#$%&'()*+,-./
-    \\0123456789
-    \\:;<=>?@
-    \\ABCDEFGHIJKLMNOPQRSTUVWXYZ
-    \\[\\]^_`
-    \\abcdefghijklmnopqrstuvwxyz
-    \\{|}~
-    
-    \\≠²³¢€½§·«»πœę©ß←↓→óþąśðæŋ’ə…łżźć„”ńµ≤≥
-;
+fn loadFont(allocator: Allocator, file_data: ?[]const u8, font_id: u16, font_size: i32) !void {
+    var all_letters = std.ArrayList(u8).init(allocator);
+    defer all_letters.deinit();
 
-fn loadFont(file_data: ?[]const u8, font_id: u16, font_size: i32) !void {
-    const codepoints = try rl.loadCodepoints(all_letters);
+    //INFO: Just guessing the font range
+    for (32..2048) |i| {
+        var utf8: [4]u8 = undefined;
+        const out_bytes = try std.unicode.utf8Encode(@intCast(i), &utf8);
+        try all_letters.appendSlice(utf8[0..out_bytes]);
+    }
+    try all_letters.append(0);
+
+    const codepoints = try rl.loadCodepoints(@ptrCast(all_letters.items));
     defer rl.unloadCodepoints(codepoints);
 
     renderer.raylib_fonts[font_id] = try rl.loadFontFromMemory(".ttf", file_data, font_size * 2, codepoints);
