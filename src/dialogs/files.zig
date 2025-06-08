@@ -7,14 +7,14 @@ const flst = @import("../file_system.zig");
 const ui = @import("../ui.zig");
 const Allocator = std.mem.Allocator;
 
-const max_files: usize = 2048;
+const max_files: usize = 4096;
 
-pub const Modes = enum{
+pub const Modes = enum {
     select,
     save,
 };
 
-pub var context = struct{
+pub var context = struct {
     allocator: Allocator,
     mode: Modes,
     selected_file: std.ArrayList(u8),
@@ -254,6 +254,7 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
             })({
                 const hovered_base = clay.pointerOver(clay.getElementId("DirectoryListContainer"));
 
+                //TODO: Increase 4096 files limit
                 for (flst.fs_context.dir_list.items, 0..) |item, i| {
                     if (item.len == 0) break;
                     if (i >= max_files) {

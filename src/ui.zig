@@ -23,7 +23,7 @@ pub const Modes = enum {
     file_dialog_save,
 };
 
-pub var context = struct{
+pub var context = struct {
     allocator: Allocator,
     memory: []u8,
     debug_mode_on: bool,
