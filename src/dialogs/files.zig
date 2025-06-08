@@ -127,7 +127,17 @@ fn inputText() !void {
     if (context.inputting) {
         switch (key) {
             .backspace => {
-                _ = context.input_text.pop();
+                //We erase bytes in loop until we hit unicode starting byte
+                while (true) {
+                    const last_byte = context.input_text.pop();
+
+                    if (last_byte) |byte| {
+                        _ = std.unicode.utf8ByteSequenceLength(byte) catch continue;
+                        return;
+                    } else {
+                        return;
+                    }
+                }
             },
             .enter => {
                 context.finished = true;

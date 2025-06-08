@@ -10,6 +10,10 @@
             .url = "git+https://github.com/johan0A/clay-zig-bindings#582095c4b7c5437f5a4fc9e0cebee289cff9ae47",
             .hash = "zclay-0.0.0-Ej1rkHDHAAAhiGLPEcSBnJks-km949W9HO4lO0Kr1k4U",
         },
+        .TrueType = .{
+            .url = "git+https://codeberg.org/andrewrk/TrueType/#4871d8bc019abaa241bf27a0507a33cb6edbcc6e",
+            .hash = "TrueType-0.0.0-Ne-mWPAFAQDPIZm1LKD1qr3bxcc-TpgB_4aHLAchHFrp",
+        },
     },
     .paths = .{
         "build.zig",

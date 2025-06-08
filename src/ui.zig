@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const rl = @import("raylib");
 const clay = @import("zclay");
 const renderer = @import("raylib_render_clay.zig");
+const ttf = @import("truetype");
 const debug_mode = @import("main.zig").debug_mode;
 const Allocator = std.mem.Allocator;
 
@@ -100,8 +101,12 @@ fn loadFont(allocator: Allocator, file_data: ?[]const u8, font_id: u16, font_siz
     var all_letters = std.ArrayList(u8).init(allocator);
     defer all_letters.deinit();
 
-    //INFO: Just guessing the font range
-    for (32..2048) |i| {
+    const tmp_font_data = try ttf.load(file_data.?);
+
+    //Load only the available codepoints
+    for (32..65536) |i| {
+        if (ttf.codepointGlyphIndex(&tmp_font_data, @intCast(i)) == null) continue;
+
         var utf8: [4]u8 = undefined;
         const out_bytes = try std.unicode.utf8Encode(@intCast(i), &utf8);
         try all_letters.appendSlice(utf8[0..out_bytes]);

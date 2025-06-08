@@ -33,6 +33,12 @@ pub fn build(b: *std.Build) void{
     });
     exe.root_module.addImport("zclay", zclay_dep.module("zclay"));
 
+    const truetype_dep = b.dependency("TrueType", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("truetype", truetype_dep.module("TrueType"));
+
     b.installArtifact(exe);
 
     // Run step
