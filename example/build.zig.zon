@@ -7,8 +7,8 @@
 
     .dependencies = .{
         .regulus = .{
-            .url = "git+https://github.com/Pivok7/regulus#a6c007f7e3ddc20665738f15dd0e6f8a2048692c",
-            .hash = "regulus-0.0.0-UDzTzlHHAQCyJ3pgG-0xr-_bBVhE-DLBPJqikevPfZ0a",
+            .url = "git+https://github.com/Pivok7/regulus#4f462ef32f99d1fe755f90d627d030b70b393c3c",
+            .hash = "regulus-0.0.0-UDzTzobHAQBYOq61usWd7d2PmtDX8GCZJyk-8OeDIdSx",
         },
     },
 
