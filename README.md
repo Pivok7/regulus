@@ -1,4 +1,4 @@
 # regulus
 Simple file dialog
 
-Using zig master version
+Using zig 0.14.1
