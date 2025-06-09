@@ -75,7 +75,11 @@ pub fn render() !?[]const u8 {
             context.cwd_str = try std.fs.cwd().realpathAlloc(context.allocator, ".");
 
             context.current_page = 1;
-            context.max_page = @divFloor(flst.fs_context.dir_list.items.len - 1, max_files_per_page) + 1;
+            if (flst.fs_context.dir_list.items.len > 0) {
+                context.max_page = @divFloor(flst.fs_context.dir_list.items.len - 1, max_files_per_page) + 1;
+            } else {
+                context.max_page = 1;
+            }
 
             clay.updateScrollContainers(
                 true,
