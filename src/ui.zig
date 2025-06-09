@@ -66,7 +66,7 @@ pub fn deinit() void {
 }
 
 pub fn render() !?[]const u8 {
-    if (rl.isKeyPressed(.d) and debug_mode) {
+    if (rl.isKeyPressed(.d) and rl.isKeyDown(.left_control) and debug_mode) {
         context.debug_mode_on = !context.debug_mode_on;
         clay.setDebugModeEnabled(context.debug_mode_on);
     }

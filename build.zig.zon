@@ -7,8 +7,8 @@
             .hash = "raylib_zig-5.6.0-dev-KE8REE0uBQD5Lzuc6qSZPtE5li3iPyU4iGQEMPqOPI11",
         },
         .zclay = .{
-            .url = "git+https://github.com/johan0A/clay-zig-bindings#582095c4b7c5437f5a4fc9e0cebee289cff9ae47",
-            .hash = "zclay-0.0.0-Ej1rkHDHAAAhiGLPEcSBnJks-km949W9HO4lO0Kr1k4U",
+            .url = "git+https://github.com/Pivok7/clay-zig-bindings#d1618770c7aff5099c07b139a6caea70d3481f7f",
+            .hash = "zclay-0.2.0-Ej1rkNXJAAAI8utSJxUNPY5EybD7bjgbcx7pPjN_atKC",
         },
         .TrueType = .{
             .url = "git+https://codeberg.org/andrewrk/TrueType/#4871d8bc019abaa241bf27a0507a33cb6edbcc6e",

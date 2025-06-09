@@ -7,7 +7,9 @@ const flst = @import("../file_system.zig");
 const ui = @import("../ui.zig");
 const Allocator = std.mem.Allocator;
 
-const max_files: usize = 4096;
+const max_files_per_page: usize = 64;
+pub var backspace_held_time: f32 = 0.0;
+pub var mouse_held_time: f32 = 0.0;
 
 pub const Modes = enum {
     select,
@@ -17,6 +19,8 @@ pub const Modes = enum {
 pub var context = struct {
     allocator: Allocator,
     mode: Modes,
+    current_page: usize,
+    max_page: usize,
     selected_file: std.ArrayList(u8),
     change_dir: ?[]const u8,
     cwd_str: ?[]const u8,
@@ -26,6 +30,8 @@ pub var context = struct {
 } {
     .allocator = undefined,
     .mode = undefined,
+    .current_page = 1,
+    .max_page = 1,
     .selected_file = undefined,
     .change_dir = null,
     .cwd_str = null,
@@ -48,6 +54,7 @@ pub fn init(allocator: Allocator, mode: Modes) !void {
 pub fn deinit() void {
     defer context.allocator = undefined;
     context.mode = undefined;
+    context.current_page = 1;
     context.selected_file.deinit();
     context.change_dir = null;
     if (context.cwd_str != null) context.allocator.free(context.cwd_str.?);
@@ -60,15 +67,18 @@ pub fn render() !?[]const u8 {
         if (try flst.isDir(context.change_dir.?)) {
             try flst.changeDir(context.change_dir.?);
             context.change_dir = null;
+
             
             if (context.cwd_str != null) {
                 context.allocator.free(context.cwd_str.?);
             }
             context.cwd_str = try std.fs.cwd().realpathAlloc(context.allocator, ".");
 
-            // Go to top
+            context.current_page = 1;
+            context.max_page = @divFloor(flst.fs_context.dir_list.items.len - 1, max_files_per_page) + 1;
+
             clay.updateScrollContainers(
-                false,
+                true,
                 .{ .x = 0, .y = 100000 },
                 100.0,
             );
@@ -111,10 +121,16 @@ pub fn render() !?[]const u8 {
         try inputText();
     }
 
-    var render_commands = try createLayout();
+    var page_num_buf = std.mem.zeroes([32]u8);
+    const page_num_text = std.fmt.bufPrint(
+        &page_num_buf, "Page: {d} / {d}",
+        .{context.current_page, context.max_page}
+    ) catch unreachable;
+
+    const render_commands = try createLayout(page_num_text);
 
     rl.beginDrawing();
-    try renderer.clayRaylibRender(&render_commands, context.allocator);
+    try renderer.clayRaylibRender(render_commands, context.allocator);
     rl.endDrawing();
 
     return null;
@@ -123,22 +139,23 @@ pub fn render() !?[]const u8 {
 fn inputText() !void {
     const key = rl.getKeyPressed();
     const key_char = rl.getCharPressed();
-    
-    if (context.inputting) {
-        switch (key) {
-            .backspace => {
-                //We erase bytes in loop until we hit unicode starting byte
-                while (true) {
-                    const last_byte = context.input_text.pop();
 
-                    if (last_byte) |byte| {
-                        _ = std.unicode.utf8ByteSequenceLength(byte) catch continue;
-                        return;
-                    } else {
-                        return;
-                    }
+    if (context.inputting) {
+        if (buttonLongPress(&backspace_held_time, .backspace) or key == .backspace) {
+            //We erase bytes in loop until we hit unicode starting byte
+            while (true) {
+                const last_byte = context.input_text.pop();
+
+                if (last_byte) |byte| {
+                    _ = std.unicode.utf8ByteSequenceLength(byte) catch continue;
+                    return;
+                } else {
+                    return;
                 }
-            },
+            }
+        }
+
+        switch (key) {
             .enter => {
                 context.finished = true;
             },
@@ -154,7 +171,7 @@ fn inputText() !void {
     }
 }
 
-fn createLayout() !clay.ClayArray(clay.RenderCommand) {
+fn createLayout(page_num_text: []const u8) ![]clay.RenderCommand {
     clay.beginLayout();
     clay.UI()(.{
         .id = .ID("OuterContainer"),
@@ -206,10 +223,6 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
                     .sizing = .grow,
                     .child_alignment = .{ .x = .left, .y = .center },
                 },
-                .scroll = .{
-                    .vertical = true,
-                    .horizontal = false
-                },
                 .background_color = ui.light_grey,
                 .corner_radius = ui.global_corner_radius,
             })({
@@ -221,6 +234,13 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
             });
         });
 
+        const lower_bound = (context.current_page - 1) * max_files_per_page;
+        const upper_bound = @min(flst.fs_context.dir_list.items.len, context.current_page * max_files_per_page);
+
+        if (context.max_page > 1) {
+            clayRenderPageBar(upper_bound, page_num_text);
+        }
+
         clay.UI()(.{
             .id = .ID("MainContent"),
             .layout = .{
@@ -231,36 +251,32 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
             .background_color = ui.light_grey,
             .corner_radius = ui.global_corner_radius,
         })({
+            const hovered_base = clay.pointerOver(clay.getElementId("DirectoryListContainer"));
+
+            // A bit of magic numbers becuase setting sizing to grow caused some problems
+            var height = @as(f32, @floatFromInt(rl.getScreenHeight())) - 132.0;
+
+            if (context.mode == .save) height -= (50.0 + 16.0);
+            if (context.max_page > 1) height -= (50.0 + 16.0);
+
+            height = @max(height, 50.0);
+
             clay.UI()(.{
                 .id = .ID("DirectoryListContainer"),
                 .layout = .{
-                    // A bit of magic numbers becuase setting sizing to grow caused some problems
-                    .sizing = .{ 
-                        .h = if (context.mode == .select) .fixed(@as(f32, @floatFromInt(rl.getScreenHeight())) - 128.0)
-                            else .fixed(@as(f32, @floatFromInt(rl.getScreenHeight())) - 178.0),
-                        .w = .grow
-                    },
+                    .sizing = .{ .h = .fixed(height), .w = .grow },
                     .direction = .top_to_bottom,
                     .child_alignment = .{ .x = .center },
                     .padding = .all(16),
                     .child_gap = 16
                 },
-                .scroll = .{
-                    .vertical = true,
-                    .horizontal = false
-                },
+                .clip = .{ .vertical = true, .child_offset = clay.getScrollOffset() },
                 .background_color = ui.light_grey,
                 .corner_radius = ui.global_corner_radius,
             })({
-                const hovered_base = clay.pointerOver(clay.getElementId("DirectoryListContainer"));
-
-                //TODO: Increase 4096 files limit
-                for (flst.fs_context.dir_list.items, 0..) |item, i| {
+                for (lower_bound..upper_bound) |i| {
+                    const item = flst.fs_context.dir_list.items[i];
                     if (item.len == 0) break;
-                    if (i >= max_files) {
-                        std.log.warn("File limit of {d} exceeded", .{max_files});
-                        break;
-                    }
 
                     clay.UI()(.{
                         .layout = .{
@@ -294,78 +310,248 @@ fn createLayout() !clay.ClayArray(clay.RenderCommand) {
                     });
                 }
             });
+        });
 
-            if (context.mode == .save) {
+        if (context.mode == .save) {
+            clay.UI()(.{
+                .id = .ID("TextInput"),
+                .layout = .{
+                    .sizing = .{ .h = .fixed(80), .w = .grow },
+                    .child_alignment = .center,
+                    .child_gap = 16,
+                    .padding = .all(16),
+                },
+                .background_color = ui.light_grey,
+                .corner_radius = ui.global_corner_radius,
+            })({
                 clay.UI()(.{
-                    .id = .ID("TextInput"),
+                    .id = .ID("Save"),
                     .layout = .{
-                        .sizing = .{ .h = .fixed(80), .w = .grow },
+                        .sizing = .{ .h = .grow, .w = .fit },
                         .child_alignment = .center,
                         .child_gap = 16,
-                        .padding = .all(16),
+                        .padding = .{ .left = 16, .right = 16 },
                     },
-                    .background_color = ui.light_grey,
+                    .background_color = if (clay.hovered()) ui.red else ui.orange,
                     .corner_radius = ui.global_corner_radius,
                 })({
-                    clay.UI()(.{
-                        .id = .ID("Save"),
-                        .layout = .{
-                            .sizing = .{ .h = .grow, .w = .fit },
-                            .child_alignment = .center,
-                            .child_gap = 16,
-                            .padding = .{ .left = 16, .right = 16 },
-                        },
-                        .background_color = if (clay.hovered()) ui.red else ui.orange,
-                        .corner_radius = ui.global_corner_radius,
-                    })({
-                        clay.text("Save", .{
-                            .font_id = ui.FONT_ID_QUICKSAND_SEMIBOLD_24,
-                            .font_size = 24,
-                            .color = .{ 61, 26, 5, 255 }
-                        });
-
-                        clay.onHover(void, {}, struct {
-                            pub fn callback(_: clay.ElementId, _: clay.PointerData, _: void) void {
-                                if (rl.isMouseButtonPressed(.left)) {
-                                    context.finished = true;
-                                }
-                            }
-                        }.callback);
+                    clay.text("Save", .{
+                        .font_id = ui.FONT_ID_QUICKSAND_SEMIBOLD_24,
+                        .font_size = 24,
+                        .color = .{ 61, 26, 5, 255 }
                     });
 
-                    clay.UI()(.{
-                        .id = .ID("TextField"),
-                        .layout = .{
-                            .sizing = .{ .h = .grow, .w = .grow },
-                            .child_alignment = .{ .x = .left, .y = .center },
-                            .child_gap = 16,
-                            .padding = .{ .left = 16, .right = 16 },
-                        },
-                        .background_color = if (clay.hovered() and !context.inputting) ui.red else ui.orange,
-                        .corner_radius = ui.global_corner_radius,
-                    })({
-                        if (rl.isMouseButtonPressed(.left) and !clay.hovered()) {
-                            context.inputting = false;
+                    clay.onHover(void, {}, struct {
+                        pub fn callback(_: clay.ElementId, _: clay.PointerData, _: void) void {
+                            if (rl.isMouseButtonPressed(.left)) {
+                                context.finished = true;
+                            }
                         }
-
-                        clay.text(context.input_text.items, .{
-                            .font_id = ui.FONT_ID_QUICKSAND_SEMIBOLD_24,
-                            .font_size = 24,
-                            .color = .{ 61, 26, 5, 255 }
-                        });
-
-                        clay.onHover(void, {}, struct {
-                            pub fn callback(_: clay.ElementId, _: clay.PointerData, _: void) void {
-                                if (rl.isMouseButtonPressed(.left)) {
-                                    context.inputting = true;
-                                }
-                            }
-                        }.callback);
-                    });
+                    }.callback);
                 });
-            }
-        });
+
+                clay.UI()(.{
+                    .id = .ID("TextField"),
+                    .layout = .{
+                        .sizing = .{ .h = .grow, .w = .grow },
+                        .child_alignment = .{ .x = .left, .y = .center },
+                        .child_gap = 16,
+                        .padding = .{ .left = 16, .right = 16 },
+                    },
+                    .background_color = if (clay.hovered() and !context.inputting) ui.red else ui.orange,
+                    .corner_radius = ui.global_corner_radius,
+                })({
+                    if (rl.isMouseButtonPressed(.left) and !clay.hovered()) {
+                        context.inputting = false;
+                    }
+
+                    clay.text(context.input_text.items, .{
+                        .font_id = ui.FONT_ID_QUICKSAND_SEMIBOLD_24,
+                        .font_size = 24,
+                        .color = .{ 61, 26, 5, 255 }
+                    });
+
+                    clay.onHover(void, {}, struct {
+                        pub fn callback(_: clay.ElementId, _: clay.PointerData, _: void) void {
+                            if (rl.isMouseButtonPressed(.left)) {
+                                context.inputting = true;
+                            }
+                        }
+                    }.callback);
+                });
+            });
+        }
     });
     return clay.endLayout();
 }
 
+pub fn clayRenderPageBar(upper_bound: usize, page_num_text: []const u8) void {
+    clay.UI()(.{
+        .layout = .{
+            .sizing = .{ .w = .grow, .h = .fixed(50) },
+            .child_alignment = .{ .y = .center },
+            .direction = .left_to_right,
+            .child_gap = 8,
+        },
+        .background_color = ui.light_grey,
+        .corner_radius = .all(8),
+    })({
+        clay.UI()(.{
+            .layout = .{
+                .sizing = .{ .w = .grow, .h = .grow },
+                .child_alignment = .center,
+            },
+            .background_color = ui.light_grey,
+            .corner_radius = .all(8),
+        })({
+
+            clay.text(page_num_text, .{
+                .font_id = ui.FONT_ID_QUICKSAND_SEMIBOLD_24,
+                .font_size = 24,
+                .color = .{ 61, 26, 5, 255 }
+            });
+        });
+
+        if (context.current_page > 1) {
+            clayRenderPageButtonLeft();
+        } else {
+            clay.UI()(.{
+                .layout = .{
+                    .sizing = .{ .w = .fixed(70), .h = .grow },
+                },
+                .background_color = ui.orange,
+                .corner_radius = .all(8),
+            })({});
+        }
+
+        if (upper_bound < flst.fs_context.dir_list.items.len) {
+            clayRenderPageButtonRight();
+        } else {
+            clay.UI()(.{
+                .layout = .{
+                    .sizing = .{ .w = .fixed(70), .h = .grow },
+                },
+                .background_color = ui.orange,
+                .corner_radius = .all(8),
+            })({});
+        }
+    });
+}
+
+pub fn clayRenderPageButtonRight() void {
+    clay.UI()(.{
+        .layout = .{
+            .sizing = .{ .w = .fixed(70), .h = .grow },
+            .child_alignment = .center,
+            .padding = .all(8),
+        },
+        .background_color = if (clay.hovered()) ui.red
+            else ui.orange,
+        .corner_radius = .all(8),
+    })({
+        clay.onHover(void, {}, struct {
+            pub fn callback(_: clay.ElementId, _: clay.PointerData, _: void) void {
+                if (mouseLongPress(&mouse_held_time, .left) or rl.isMouseButtonPressed(.left)) {
+                    if (context.current_page < context.max_page) {
+                        updatePage(context.current_page + 1);
+                    }
+                }
+            }
+        }.callback);
+
+        clay.text(
+            "--->",
+            .{
+                .font_id = ui.FONT_ID_QUICKSAND_SEMIBOLD_24,
+                .font_size = 24,
+                .color = .{ 61, 26, 5, 255 }
+            }
+        );
+    });
+}
+
+pub fn clayRenderPageButtonLeft() void {
+    clay.UI()(.{
+        .layout = .{
+            .sizing = .{ .w = .fixed(70), .h = .grow },
+            .child_alignment = .center,
+            .padding = .all(8),
+        },
+        .background_color = if (clay.hovered()) ui.red
+            else ui.orange,
+        .corner_radius = .all(8),
+    })({
+        clay.onHover(void, {}, struct {
+            pub fn callback(_: clay.ElementId, _: clay.PointerData, _: void) void {
+                if (mouseLongPress(&mouse_held_time, .left) or rl.isMouseButtonPressed(.left)) {
+                    if (context.current_page > 1) {
+                        updatePage(context.current_page - 1);
+                    }
+                }
+            }
+        }.callback);
+
+        clay.text(
+            "<---",
+            .{
+                .font_id = ui.FONT_ID_QUICKSAND_SEMIBOLD_24,
+                .font_size = 24,
+                .color = .{ 61, 26, 5, 255 }
+            }
+        );
+    });
+}
+
+pub fn updatePage(val: usize) void {
+    if (val < 1) {
+        std.log.warn("Invalid page set {d}", .{val});
+        context.current_page = 1;
+    } else if (val > context.max_page) {
+        std.log.warn("Invalid page set {d}", .{val});
+        context.current_page = context.max_page;
+    } else {
+        context.current_page = val;
+    }
+
+    clay.updateScrollContainers(
+        true,
+        .{ .x = 0, .y = 100000 },
+        100.0,
+    );
+}
+
+fn buttonLongPress(held_time: *f32, key: rl.KeyboardKey) bool {
+    const activation_time: f32 = 0.3;
+    const press_frequency: f32 = 0.03;
+
+    if (rl.isKeyDown(key)) {
+        held_time.* += rl.getFrameTime();
+    } else {
+        held_time.* = 0.0;
+    }
+    if (held_time.* > activation_time) {
+        if (held_time.* > activation_time + press_frequency) {
+            held_time.* = activation_time;
+            return true;
+        }
+    }
+    return false;
+}
+
+fn mouseLongPress(held_time: *f32, key: rl.MouseButton) bool {
+    const activation_time: f32 = 0.2;
+    const press_frequency: f32 = 0.05;
+
+    if (rl.isMouseButtonDown(key)) {
+        held_time.* += rl.getFrameTime();
+    } else {
+        held_time.* = 0.0;
+    }
+    if (held_time.* > activation_time) {
+        if (held_time.* > activation_time + press_frequency) {
+            held_time.* = activation_time;
+            return true;
+        }
+    }
+    return false;
+}
