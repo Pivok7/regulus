@@ -1,14 +1,13 @@
 .{
     .name = .example,
-
     .version = "0.0.1",
-
+    .minimum_zig_version = "0.14.1",
     .fingerprint = 0x6eec9b9f27887d5e, // Changing this has security and trust implications.
 
     .dependencies = .{
         .regulus = .{
-            .url = "git+https://github.com/Pivok7/regulus#e60f5d36286abc6380ad2db5ad7300ef66cbc086",
-            .hash = "regulus-0.0.0-UDzTzoHWAQBC7vHoZc0SS0VfLnjXERjAFwPn2GikQjPH",
+            .url = "../../regulus",
+            .hash = "regulus-0.1.0-UDzTzsHWAQBtQGYysLnQAtKEND7FcrNcBNxxKui-M1Br",
         },
     },
 

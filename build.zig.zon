@@ -2,7 +2,7 @@
     .name = .regulus,
     .version = "0.1.0",
     .minimum_zig_version = "0.14.1",
-    .fingerprint = 0x13d8e417ced33c50,
+    .fingerprint = 0x13d8e417ced33c50, // Changing this has security and trust implications.
 
     .dependencies = .{
         .raylib_zig = .{

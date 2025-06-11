@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
-        .strip = if (optimize != .Debug) true else false,
+        .strip = optimize != .Debug,
     });
     
     const regulus_dep = b.dependency("regulus", .{
