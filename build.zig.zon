@@ -1,6 +1,9 @@
 .{
     .name = .regulus,
-    .version = "0.0.0",
+    .version = "0.1.0",
+    .minimum_zig_version = "0.14.1",
+    .fingerprint = 0x13d8e417ced33c50,
+
     .dependencies = .{
         .raylib_zig = .{
             .url = "git+https://github.com/Not-Nik/raylib-zig#5bbafa4f86eb3e3f41a107bbec6b8822e0f87c93",
@@ -15,6 +18,7 @@
             .hash = "TrueType-0.0.0-Ne-mWPAFAQDPIZm1LKD1qr3bxcc-TpgB_4aHLAchHFrp",
         },
     },
+
     .paths = .{
         "build.zig",
         "build.zig.zon",
@@ -22,5 +26,4 @@
         "LICENSE",
         "README.md",
     },
-    .fingerprint = 0x13d8e417ced33c50,
 }
