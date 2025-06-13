@@ -10,7 +10,7 @@
             .hash = "raylib_zig-5.6.0-dev-KE8REE0uBQD5Lzuc6qSZPtE5li3iPyU4iGQEMPqOPI11",
         },
         .zclay = .{
-            .url = "git+https://github.com/Pivok7/clay-zig-bindings#d1618770c7aff5099c07b139a6caea70d3481f7f",
+            .url = "git+https://github.com/johan0A/clay-zig-bindings#37110b6e0ed3de44fb7e9f9c2744a1837d8b84cc",
             .hash = "zclay-0.2.0-Ej1rkNXJAAAI8utSJxUNPY5EybD7bjgbcx7pPjN_atKC",
         },
         .TrueType = .{

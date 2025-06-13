@@ -26,12 +26,10 @@ pub const Modes = enum {
 pub var context = struct {
     allocator: Allocator,
     memory: []u8,
-    debug_mode_on: bool,
     mode: Modes,
 } {
     .allocator = undefined,
     .memory = undefined,
-    .debug_mode_on = false,
     .mode = .file_dialog_select,
 };
 
@@ -41,7 +39,6 @@ pub fn init(allocator: std.mem.Allocator, mode: Modes) !void {
     
     context.allocator = allocator;
     context.memory = try context.allocator.alloc(u8, min_memory_size);
-    context.debug_mode_on = debug_mode;
     context.mode = mode;
 
     const arena: clay.Arena = clay.createArenaWithCapacityAndMemory(context.memory);
@@ -62,13 +59,11 @@ pub fn deinit() void {
 
     defer context.allocator = undefined;
     context.allocator.free(context.memory);
-    context.debug_mode_on = false;
 }
 
 pub fn render() !?[]const u8 {
     if (rl.isKeyPressed(.d) and rl.isKeyDown(.left_control) and debug_mode) {
-        context.debug_mode_on = !context.debug_mode_on;
-        clay.setDebugModeEnabled(context.debug_mode_on);
+        clay.setDebugModeEnabled(!clay.isDebugModeEnabled());
     }
 
     const mouse_pos = rl.getMousePosition();
