@@ -6,8 +6,8 @@
 
     .dependencies = .{
         .regulus = .{
-            .url = "../../regulus",
-            .hash = "regulus-0.1.0-UDzTzsHWAQBtQGYysLnQAtKEND7FcrNcBNxxKui-M1Br",
+            .url = "../../regulus/",
+            .hash = "regulus-0.1.0-UDzTzp7UAQDFehj-sMPTNzCy1aizvgxTI3GMI2VBFkmZ",
         },
     },
 

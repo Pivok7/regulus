@@ -4,7 +4,7 @@ const util = @import("util.zig");
 const debug_mode = @import("main.zig").debug_mode;
 const Allocator = std.mem.Allocator;
 
-pub var fs_context = struct{
+pub var context = struct{
     allocator: Allocator,
     dir_list: std.ArrayList([]const u8),
     original_cwd: std.fs.Dir,
@@ -15,20 +15,20 @@ pub var fs_context = struct{
 };
 
 pub fn init(allocator: Allocator) !void {
-    fs_context.allocator = allocator;
-    fs_context.dir_list = std.ArrayList([]const u8).init(fs_context.allocator);
-    fs_context.original_cwd = try std.fs.cwd().openDir(".", .{});
+    context.allocator = allocator;
+    context.dir_list = std.ArrayList([]const u8).init(context.allocator);
+    context.original_cwd = try std.fs.cwd().openDir(".", .{});
 
     try changeDir(".");
 }
 
 pub fn deinit() void {
-    defer fs_context.allocator = undefined;
-    for (fs_context.dir_list.items) |item| {
-        fs_context.allocator.free(item);
+    defer context.allocator = undefined;
+    for (context.dir_list.items) |item| {
+        context.allocator.free(item);
     }
-    fs_context.dir_list.deinit();
-    fs_context.original_cwd.close();
+    context.dir_list.deinit();
+    context.original_cwd.close();
 }
 
 pub fn changeDir(path: []const u8) !void {
@@ -37,19 +37,19 @@ pub fn changeDir(path: []const u8) !void {
 
     try dir.setAsCwd();
 
-    for (fs_context.dir_list.items) |item| {
-        fs_context.allocator.free(item);
+    for (context.dir_list.items) |item| {
+        context.allocator.free(item);
     }
-    fs_context.dir_list.clearAndFree();
+    context.dir_list.clearAndFree();
 
     var iter = dir.iterate();
     while (try iter.next()) |item| {
-        const slice = try fs_context.allocator.alloc(u8, item.name.len + 1);
+        const slice = try context.allocator.alloc(u8, item.name.len + 1);
         std.mem.copyForwards(u8, slice, item.name);
         slice[item.name.len] = '\x00';
-        try fs_context.dir_list.append(slice);
+        try context.dir_list.append(slice);
     }
-    util.sortFiles(.alpha, &fs_context.dir_list);
+    util.sortFiles(.alpha, &context.dir_list);
 }
 
 pub fn isDir(file_name: []const u8) !bool {

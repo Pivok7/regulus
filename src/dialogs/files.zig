@@ -75,8 +75,8 @@ pub fn render() !?[]const u8 {
             context.cwd_str = try std.fs.cwd().realpathAlloc(context.allocator, ".");
 
             context.current_page = 1;
-            if (flst.fs_context.dir_list.items.len > 0) {
-                context.max_page = @divFloor(flst.fs_context.dir_list.items.len - 1, max_files_per_page) + 1;
+            if (flst.context.dir_list.items.len > 0) {
+                context.max_page = @divFloor(flst.context.dir_list.items.len - 1, max_files_per_page) + 1;
             } else {
                 context.max_page = 1;
             }
@@ -145,7 +145,7 @@ fn inputText() !void {
     const key_char = rl.getCharPressed();
 
     if (context.inputting) {
-        if (buttonLongPress(&backspace_held_time, .backspace) or key == .backspace) {
+        if (rl.isKeyPressedRepeat(.backspace) or key == .backspace) {
             //We erase bytes in loop until we hit unicode starting byte
             while (true) {
                 const last_byte = context.input_text.pop();
@@ -239,7 +239,7 @@ fn createLayout(page_num_text: []const u8) ![]clay.RenderCommand {
         });
 
         const lower_bound = (context.current_page - 1) * max_files_per_page;
-        const upper_bound = @min(flst.fs_context.dir_list.items.len, context.current_page * max_files_per_page);
+        const upper_bound = @min(flst.context.dir_list.items.len, context.current_page * max_files_per_page);
 
         if (context.max_page > 1) {
             clayRenderPageBar(upper_bound, page_num_text);
@@ -279,7 +279,7 @@ fn createLayout(page_num_text: []const u8) ![]clay.RenderCommand {
                 .corner_radius = ui.global_corner_radius,
             })({
                 for (lower_bound..upper_bound) |i| {
-                    const item = flst.fs_context.dir_list.items[i];
+                    const item = flst.context.dir_list.items[i];
                     if (item.len == 0) break;
 
                     clay.UI()(.{
@@ -428,7 +428,7 @@ pub fn clayRenderPageBar(upper_bound: usize, page_num_text: []const u8) void {
             })({});
         }
 
-        if (upper_bound < flst.fs_context.dir_list.items.len) {
+        if (upper_bound < flst.context.dir_list.items.len) {
             clayRenderPageButtonRight();
         } else {
             clay.UI()(.{
@@ -522,24 +522,6 @@ pub fn updatePage(val: usize) void {
         .{ .x = 0, .y = 100000 },
         100.0,
     );
-}
-
-fn buttonLongPress(held_time: *f32, key: rl.KeyboardKey) bool {
-    const activation_time: f32 = 0.3;
-    const press_frequency: f32 = 0.03;
-
-    if (rl.isKeyDown(key)) {
-        held_time.* += rl.getFrameTime();
-    } else {
-        held_time.* = 0.0;
-    }
-    if (held_time.* > activation_time) {
-        if (held_time.* > activation_time + press_frequency) {
-            held_time.* = activation_time;
-            return true;
-        }
-    }
-    return false;
 }
 
 fn mouseLongPress(held_time: *f32, key: rl.MouseButton) bool {
